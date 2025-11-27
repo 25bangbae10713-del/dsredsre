@@ -1,90 +1,138 @@
-Fc Mobile Explainer Streamlit
-· python
 import streamlit as st
+from datetime import datetime
 
+st.set_page_config(page_title="FC Mobile 빠른 설명", page_icon="⚽", layout="wide")
 
-    st.header("예시 선수 스쿼드")
+# -----------------------------
+# 기본 데이터
+# -----------------------------
+GAME_TITLE = "FC Mobile"
+GAME_DESC = (
+    "FC Mobile은 모바일에서 즐기는 축구 액션 & 팀 빌딩 게임입니다. "
+    "선수 영입, 전술 설정, 경기 조작을 통해 실력을 키우는 게임입니다."
+)
+
+KEY_FEATURES = [
+    ("팀 빌딩", "선수 영입, 성장, 포지션 배치"),
+    ("전술 설정", "포메이션, 공격/수비 전략 조절"),
+    ("실시간 경기", "터치 기반 슈팅, 패스, 드리블 조작"),
+    ("이벤트/리그", "리그전, 친선전, 미션 이벤트"),
+]
+
+CONTROLS = {
+    "터치 드리블": "드리블 및 방향 조절",
+    "스와이프 슛": "슛 파워 조절 및 슛 방향 설정",
+    "탭 패스": "빠르게 패스 진행",
+    "스페셜 버튼": "특수 스킬 발동",
+}
+
+TIPS = [
+    "초반에는 모든 포지션을 균형 있게 키우는 것이 좋습니다.",
+    "상대 포메이션을 보고 공격 루트를 조절하세요.",
+    "이벤트 보상은 선수 성장에 매우 중요합니다.",
+]
+
+GLOSSARY = {
+    "포메이션": "선수 배치 형태 (예: 4-3-3, 4-2-3-1)",
+    "스태미너": "선수의 체력, 경기 후반에 성능에 영향",
+    "전술": "팀의 공격/수비 스타일",
+}
+
+EXAMPLE_PLAYERS = [
+    {"name": "홍길동", "pos": "ST", "ovr": 78, "trait": "속력형"},
+    {"name": "이민호", "pos": "CM", "ovr": 74, "trait": "패스마스터"},
+    {"name": "김수아", "pos": "CB", "ovr": 76, "trait": "수비형"},
+]
+
+# -----------------------------
+# UI 구성
+# -----------------------------
+st.title(f"{GAME_TITLE} — 빠른 설명 페이지 ⚽")
+
+col1, col2 = st.columns([3, 1])
+
+# 왼쪽 영역
+with col1:
+    st.header("게임 소개")
+    st.write(GAME_DESC)
+
+    st.header("핵심 기능")
+    for name, desc in KEY_FEATURES:
+        st.write(f"- **{name}**: {desc}")
+
+    st.header("초보자 팁")
+    for tip in TIPS:
+        st.write(f"- {tip}")
+
+    st.header("조작법")
+    for key, value in CONTROLS.items():
+        st.write(f"- **{key}**: {value}")
+
+    st.header("예시 선수")
     for p in EXAMPLE_PLAYERS:
-        st.write(f"{p['name']} — {p['pos']} • OVR {p['ovr']} • {p['trait']}")
+        st.write(f"{p['name']} — {p['pos']} | OVR {p['ovr']} | {p['trait']}")
 
-
-    with st.expander("전술 템플릿 예시 (클릭하여 보기)"):
-        st.subheader("안정형 4-2-3-1")
-        st.write("수비를 안정시키고 역습에 강한 설정. 수비형 미드필더 2명을 둡니다.")
-        st.subheader("공격형 4-3-3")
-        st.write("전방 압박과 측면 공격을 활용하는 공격적인 템플릿입니다.")
-
-
-    st.header("용어집")
+    st.header("용어 모음")
     for term, meaning in GLOSSARY.items():
-        st.write(f"**{term}** — {meaning}")
+        st.write(f"- **{term}**: {meaning}")
 
 
+# 오른쪽 사이드 영역
 with col2:
-    st.info("사이드바: 빠른 검색 & 설명 복사")
+    st.subheader("빠른 검색")
+    search = st.text_input("검색어 입력", "")
 
+    if search:
+        st.write("검색 결과:")
+        found = False
 
-    search_term = st.text_input("찾을 용어 검색", "포메이션")
-    if search_term:
-        results = []
-        # 간단한 검색: 키, 키워드 포함 여부
-        for d in [GAME_DESC] + [f"{name}: {desc}" for name, desc in KEY_FEATURES]:
-            if search_term.lower() in d.lower():
-                results.append(d)
+        # 용어 검색
         for term, meaning in GLOSSARY.items():
-            if search_term.lower() in term.lower() or search_term.lower() in meaning.lower():
-                results.append(f"{term} — {meaning}")
-        if results:
-            st.write("검색 결과:")
-            for r in results:
-                st.write("- ", r)
-        else:
-            st.write("검색 결과가 없습니다. 다른 단어로 시도하세요.")
+            if search.lower() in term.lower() or search.lower() in meaning.lower():
+                st.write(f"- **{term}**: {meaning}")
+                found = True
 
+        # 기능 검색
+        for name, desc in KEY_FEATURES:
+            if search.lower() in name.lower() or search.lower() in desc.lower():
+                st.write(f"- {name}: {desc}")
+                found = True
+
+        if not found:
+            st.write("검색 결과가 없습니다.")
+
+    st.subheader("텍스트 다운로드")
+    text_data = (
+        f"{GAME_TITLE}\n\n"
+        f"{GAME_DESC}\n\n"
+        "핵심 기능:\n" +
+        "\n".join([f"- {n}: {d}" for n, d in KEY_FEATURES]) +
+        "\n\n팁:\n" +
+        "\n".join([f"- {t}" for t in TIPS])
+    )
 
     st.download_button(
-        label="설명서 텍스트로 다운로드",
-        data="\n".join([
-            GAME_TITLE,
-            "",
-            GAME_DESC,
-            "",
-            "핵심 기능:",
-        ] + [f"- {n}: {d}" for n, d in KEY_FEATURES] + ["", "팁:"] + [f"- {t}" for t in TIPS]),
-        file_name=f"{GAME_TITLE}_cheatsheet_{datetime.now().strftime('%Y%m%d')}.txt",
+        "설명서 다운로드",
+        text_data,
+        file_name=f"fc_mobile_{datetime.now().strftime('%Y%m%d')}.txt",
         mime="text/plain",
     )
 
-
-# Footer: 간단한 Q&A 자동 생성
+# FAQ
 st.markdown("---")
-st.subheader("자주 묻는 질문(자동 생성)")
-faq_q = st.selectbox("질문 선택", [
-    "경기에서 빠르게 점수를 올리는 방법",
-    "선수 레벨업 효율적으로 하는 법",
-    "초보자가 주의할 점",
+st.subheader("자주 묻는 질문")
+
+faq = st.selectbox("질문을 선택하세요", [
+    "골을 빨리 넣는 방법",
+    "효율적인 선수 강화법",
+    "초보자가 알아야 할 점",
 ])
 
-
-if faq_q == "경기에서 빠르게 점수를 올리는 방법":
-    st.write("측면 돌파 후 크로스, 세트피스 기회를 노려보세요. 직접 슛을 노릴 때는 슛 파워와 정확도를 함께 고려하세요.")
-elif faq_q == "선수 레벨업 효율적으로 하는 법":
-    st.write("주전 선수 위주로 훈련 횟수를 투자하고, 이벤트 보상으로 얻는 경험치 버프를 활용하세요.")
+if faq == "골을 빨리 넣는 방법":
+    st.write("측면 공격, 스루 패스, 크로스 활용이 효과적입니다.")
+elif faq == "효율적인 선수 강화법":
+    st.write("이벤트 보상과 강화 재화를 모아 주전 선수부터 강화하세요.")
 else:
-    st.write("초반에는 무리한 과금이나 선수 편중을 피하고, 게임의 기본 조작과 전술 변화를 익히세요.")
+    st.write("전술 변경과 조작법 숙지가 중요합니다. 초반 과금은 추천하지 않습니다.")
 
-
-# Small utility: Export current page content as markdown
-if st.button("페이지 내용 복사(마크다운) → 클립보드"):
-    md = []
-    md.append(f"# {GAME_TITLE}\n")
-    md.append(GAME_DESC + "\n")
-    md.append("## 핵심 기능\n")
-    for n, d in KEY_FEATURES:
-        md.append(f"- **{n}**: {d}\n")
-    st.code("\n".join(md))
-    st.success("마크다운 형식이 아래 코드 블록에 생성되었습니다. Ctrl+C로 복사하세요.")
-
-
-# 마지막 안내
-st.caption("이 앱은 학습용 예시입니다. 실제 게임 정보는 게임 내 가이드나 공식 페이지를 참고하세요.")
+st.caption("이 페이지는 예시로 제작된 학습용 사이트입니다.")
