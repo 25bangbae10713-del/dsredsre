@@ -1,145 +1,182 @@
 import streamlit as st
 from datetime import datetime
-import io
+import os
 
-# FC Mobile Quick Explainer - Streamlit single-file app
-# Usage:
-# 1) Copy this file to main.py
-# 2) Push to a GitHub repo and deploy on Streamlit Cloud (https://streamlit.io/cloud)
+# Try to import googletrans (community library) first. If not available, the app will
+# fall back to requiring a Google Cloud Translate API key (recommended for reliability).
+try:
+    from googletrans import Translator, LANGUAGES as GT_LANGS
+    HAS_GOOGLETRANS = True
+except Exception:
+    HAS_GOOGLETRANS = False
+    GT_LANGS = {}
 
-st.set_page_config(page_title="FC Mobile 한눈에 보기", page_icon="⚽", layout="wide")
+# A small helper to normalize language dictionaries into the form {code: name}
+def get_language_map():
+    # Primary source: googletrans languages if available
+    lang_map = {}
+    if HAS_GOOGLETRANS:
+        # googletrans uses lowercase codes and English names
+        for code, name in GT_LANGS.items():
+            lang_map[code] = name.title()
+    # Add some common extra aliases (optional)
+    extras = {
+        "auto": "Auto Detect",
+    }
+    for k, v in extras.items():
+        if k not in lang_map:
+            lang_map[k] = v
+    # Make sure keys are sorted for display
+    return dict(sorted(lang_map.items(), key=lambda x: x[1]))
 
-# --- Data (edit these to match the 실제 게임 내용) ---
-GAME_TITLE = "FC Mobile"
-GAME_DESC = (
-    "FC Mobile은 모바일 플랫폼에서 즐기는 축구 매니지먼트 & 액션 게임입니다."
-    "팀 구성, 전술 설정, 경기 중 실시간 조작(혹은 자동화)을 통해 승리를 노립니다."
+LANG_MAP = get_language_map()
+
+# Simple fuzzy search for language names or codes
+def search_languages(query):
+    q = query.strip().lower()
+    if not q:
+        return list(LANG_MAP.items())
+    results = []
+    for code, name in LANG_MAP.items():
+        if q in code.lower() or q in name.lower():
+            results.append((code, name))
+    # if no direct substring matches, do a loose startswith / contains on tokens
+    if not results:
+        for code, name in LANG_MAP.items():
+            tokens = name.lower().split()
+            if any(t.startswith(q) for t in tokens):
+                results.append((code, name))
+    return results
+
+# Translation function using googletrans if present
+def translate_with_googletrans(text, src, dest):
+    if not HAS_GOOGLETRANS:
+        raise RuntimeError("googletrans 패키지가 설치되어 있지 않습니다.")
+    translator = Translator()
+    res = translator.translate(text, src=src if src != "auto" else None, dest=dest)
+    return res.text, getattr(res, 'pronunciation', None)
+
+# Placeholder for Google Cloud Translate fallback (requires API key)
+def translate_with_google_cloud(text, src, dest, api_key):
+    # We avoid depending on google-cloud-translate library here to keep the sample simple.
+    # If you want to use Google Cloud Translate, install `google-cloud-translate` and
+    # replace this function with an implementation that uses that client and the api_key.
+    raise NotImplementedError("Google Cloud Translate fallback not implemented in this sample.\n"
+                              "Install googletrans or implement the Cloud Translate client.")
+
+# Streamlit UI
+st.set_page_config(page_title="Universal Translator", page_icon="🌐", layout="wide")
+st.title("세상의 모든 언어 번역기 — 유니버설 트랜슬레이터 🌍")
+st.markdown(
+    """
+    이 앱은 `googletrans`(무료 커뮤니티 라이브러리)를 기본으로 사용합니다.
+
+    **사용법**
+    1. 왼쪽에서 번역할 언어(검색 가능)를 고르고, 번역될 언어를 선택하세요.
+    2. 텍스트를 입력하고 `번역` 버튼을 누르세요.
+
+    **주의**: `googletrans`는 비공식 라이브러리라 때때로 제한될 수 있습니다. 안정적 사용을 위해
+    Google Cloud Translate API 키를 환경변수 `GOOGLE_API_KEY`로 설정하거나, 직접 Cloud Translate 클라이언트를
+    연결하세요. (고급 옵션은 하단을 참고)
+    """
 )
 
-KEY_FEATURES = [
-    ("팀 빌딩", "선수 스카우팅, 트레이닝, 포지션 배치"),
-    ("전술 커스터마이즈", "포메이션, 압박 레벨, 공격/수비 스타일 설정"),
-    ("라이브 경기", "간단한 터치로 슛/패스/드리블 조작 또는 자동 플레이"),
-    ("이벤트/리그", "친선전, 리그전, 토너먼트 이벤트 참여"),
-]
-
-CONTROLS = {
-    "터치/스와이프": "드리블, 슛 각도 조작",
-    "탭": "패스, 선수 선택",
-    "스페셜 버튼": "특수 기술(필살기) 사용",
-}
-
-TIPS = [
-    "초반에는 전체 스쿼드를 고르게 성장시키세요. 특정 포지션에만 치중하면 전술 운영이 어려워집니다.",
-    "상대 포메이션을 보고 전술을 유연하게 바꿔보세요. 측면이 약하면 측면 공격을 늘리세요.",
-    "이벤트는 보상을 주기 때문에 정기적으로 참여해 자원을 확보하세요.",
-]
-
-GLOSSARY = {
-    "포메이션": "팀의 포지션 배치 (예: 4-4-2, 4-3-3)",
-    "STAMINA(스태미너)": "경기 지속 능력. 선수를 교체해 관리하세요.",
-    "TAC(전술)": "팀 전체의 플레이 스타일을 조절합니다.",
-}
-
-EXAMPLE_PLAYERS = [
-    {"name": "김태호", "pos": "ST", "ovr": 78, "trait": "속력형"},
-    {"name": "이서윤", "pos": "CM", "ovr": 74, "trait": "패스마스터"},
-    {"name": "박준영", "pos": "CB", "ovr": 76, "trait": "수비형"},
-]
-
-# --- UI ---
-st.title(f"{GAME_TITLE} — 빠른 설명서 ⚽")
-col1, col2 = st.columns([3, 1])
+col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.header("게임 한줄 요약")
-    st.write(GAME_DESC)
+    st.subheader("번역기")
+    input_text = st.text_area("번역할 텍스트를 입력하세요", height=200)
 
-    st.header("핵심 기능")
-    for name, desc in KEY_FEATURES:
-        st.markdown(f"**{name}** — {desc}")
+    # Source language selector with search
+    st.markdown("**원문 언어 (검색 가능)**")
+    lang_search_src = st.text_input("원문 언어 검색", value="auto")
+    src_options = search_languages(lang_search_src)
+    # show as selectbox with "code — Name"
+    src_choice = st.selectbox(
+        "원문 언어 선택",
+        options=[f"{code} — {name}" for code, name in src_options],
+        index=0 if src_options else None,
+    )
+    src_code = src_choice.split(" — ")[0]
 
-    st.header("초보자 팁")
-    for t in TIPS:
-        st.write("- " + t)
+    # Target language selector with search
+    st.markdown("**번역 언어 (검색 가능)**")
+    lang_search_dst = st.text_input("번역 언어 검색", value="en", key="dst_search")
+    dst_options = search_languages(lang_search_dst)
+    dst_choice = st.selectbox(
+        "번역 언어 선택",
+        options=[f"{code} — {name}" for code, name in dst_options],
+        index=0 if dst_options else None,
+        key="dst_select",
+    )
+    dst_code = dst_choice.split(" — ")[0]
 
-    st.header("컨트롤 & 조작법")
-    for k, v in CONTROLS.items():
-        st.write(f"**{k}**: {v}")
+    col_btn1, col_btn2 = st.columns([1, 1])
+    with col_btn1:
+        translate_btn = st.button("번역")
+    with col_btn2:
+        swap_btn = st.button("언어 바꾸기 ↔")
 
-    st.header("예시 선수 스쿼드")
-    for p in EXAMPLE_PLAYERS:
-        st.write(f"{p['name']} — {p['pos']} • OVR {p['ovr']} • {p['trait']}")
+    if swap_btn:
+        # Swap the search boxes by swapping their session state values
+        tmp = st.session_state.get("dst_search", "en")
+        st.session_state["dst_search"] = st.session_state.get("lang_search_src", "auto")
+        st.session_state["lang_search_src"] = tmp
+        st.experimental_rerun()
 
-    with st.expander("전술 템플릿 예시 (클릭하여 보기)"):
-        st.subheader("안정형 4-2-3-1")
-        st.write("수비를 안정시키고 역습에 강한 설정. 수비형 미드필더 2명을 둡니다.")
-        st.subheader("공격형 4-3-3")
-        st.write("전방 압박과 측면 공격을 활용하는 공격적인 템플릿입니다.")
+    translated_text = ""
+    pronunciation = None
 
-    st.header("용어집")
-    for term, meaning in GLOSSARY.items():
-        st.write(f"**{term}** — {meaning}")
+    if translate_btn:
+        if not input_text.strip():
+            st.warning("번역할 텍스트를 먼저 입력하세요.")
+        else:
+            try:
+                if HAS_GOOGLETRANS:
+                    translated_text, pronunciation = translate_with_googletrans(input_text, src_code, dst_code)
+                else:
+                    api_key = os.getenv("GOOGLE_API_KEY", None)
+                    if api_key:
+                        translated_text = translate_with_google_cloud(input_text, src_code, dst_code, api_key)
+                    else:
+                        st.error("서버에 `googletrans`가 설치되어 있지 않고, `GOOGLE_API_KEY`도 없습니다.\n"
+                                 "googletrans를 설치하거나 Google Cloud Translate API 키를 설정하세요.")
+            except Exception as e:
+                st.error(f"번역 중 오류가 발생했습니다: {e}")
+
+    if translated_text:
+        st.subheader("번역 결과")
+        st.write(translated_text)
+        if pronunciation:
+            st.caption(f"발음: {pronunciation}")
+        # Download button
+        st.download_button(
+            "번역 결과 다운로드",
+            translated_text,
+            file_name=f"translation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain",
+        )
 
 with col2:
-    st.info("사이드바: 빠른 검색 & 설명 복사")
-
-    search_term = st.text_input("찾을 용어 검색", "포메이션")
-    if search_term:
-        results = []
-        # 간단한 검색: 키, 키워드 포함 여부
-        for d in [GAME_DESC] + [f"{name}: {desc}" for name, desc in KEY_FEATURES]:
-            if search_term.lower() in d.lower():
-                results.append(d)
-        for term, meaning in GLOSSARY.items():
-            if search_term.lower() in term.lower() or search_term.lower() in meaning.lower():
-                results.append(f"{term} — {meaning}")
-        if results:
-            st.write("검색 결과:")
-            for r in results:
-                st.write("- ", r)
+    st.subheader("언어 찾아보기 & 설명")
+    q = st.text_input("언어 이름이나 코드를 입력해 찾아보세요 (예: korean, ko, spanish)")
+    if q:
+        matches = search_languages(q)
+        if matches:
+            for code, name in matches:
+                st.write(f"**{code}** — {name}")
         else:
-            st.write("검색 결과가 없습니다. 다른 단어로 시도하세요.")
+            st.write("일치하는 언어를 찾을 수 없습니다.")
 
-    st.download_button(
-        label="설명서 텍스트로 다운로드",
-        data="\n".join([
-            GAME_TITLE,
-            "",
-            GAME_DESC,
-            "",
-            "핵심 기능:",
-        ] + [f"- {n}: {d}" for n, d in KEY_FEATURES] + ["", "팁:"] + [f"- {t}" for t in TIPS]),
-        file_name=f"{GAME_TITLE}_cheatsheet_{datetime.now().strftime('%Y%m%d')}.txt",
-        mime="text/plain",
+    st.markdown("---")
+    st.subheader("환경 설정 (옵션)")
+    st.write("- 안정적이고 많은 언어 지원을 원하면 Google Cloud Translate API 키를 설정하세요.")
+    st.write("- 기본 무료 옵션은 `googletrans` 라이브러리에 의존합니다 (비공식).\n  이를 사용하려면 레포에 requirements.txt에 `googletrans==4.0.0-rc1`를 추가하세요.")
+
+    st.markdown("---")
+    st.subheader("개발자용 메모")
+    st.write(
+        "이 샘플은 학습용입니다. '세상의 모든 언어'를 완벽히 지원하려면 상용 API(예: Google Cloud, Azure Translator, DeepL 엔터프라이즈 등)를 연결하는 것이 좋습니다."
     )
 
-# Footer: 간단한 Q&A 자동 생성
-st.markdown("---")
-st.subheader("자주 묻는 질문(자동 생성)")
-faq_q = st.selectbox("질문 선택", [
-    "경기에서 빠르게 점수를 올리는 방법",
-    "선수 레벨업 효율적으로 하는 법",
-    "초보자가 주의할 점",
-])
-
-if faq_q == "경기에서 빠르게 점수를 올리는 방법":
-    st.write("측면 돌파 후 크로스, 세트피스 기회를 노려보세요. 직접 슛을 노릴 때는 슛 파워와 정확도를 함께 고려하세요.")
-elif faq_q == "선수 레벨업 효율적으로 하는 법":
-    st.write("주전 선수 위주로 훈련 횟수를 투자하고, 이벤트 보상으로 얻는 경험치 버프를 활용하세요.")
-else:
-    st.write("초반에는 무리한 과금이나 선수 편중을 피하고, 게임의 기본 조작과 전술 변화를 익히세요.")
-
-# Small utility: Export current page content as markdown
-if st.button("페이지 내용 복사(마크다운) → 클립보드"):
-    md = []
-    md.append(f"# {GAME_TITLE}\n")
-    md.append(GAME_DESC + "\n")
-    md.append("## 핵심 기능\n")
-    for n, d in KEY_FEATURES:
-        md.append(f"- **{n}**: {d}\n")
-    st.code("\n".join(md))
-    st.success("마크다운 형식이 아래 코드 블록에 생성되었습니다. Ctrl+C로 복사하세요.")
-
-# 마지막 안내
-st.caption("이 앱은 학습용 예시입니다. 실제 게임 정보는 게임 내 가이드나 공식 페이지를 참고하세요.")
+st.caption("이 앱은 예시용입니다. 실제 번역 품질은 사용된 엔진에 따라 달라집니다.")
