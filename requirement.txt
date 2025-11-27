@@ -1,0 +1,145 @@
+import streamlit as st
+from datetime import datetime
+import io
+
+# FC Mobile Quick Explainer - Streamlit single-file app
+# Usage:
+# 1) Copy this file to main.py
+# 2) Push to a GitHub repo and deploy on Streamlit Cloud (https://streamlit.io/cloud)
+
+st.set_page_config(page_title="FC Mobile 한눈에 보기", page_icon="⚽", layout="wide")
+
+# --- Data (edit these to match the 실제 게임 내용) ---
+GAME_TITLE = "FC Mobile"
+GAME_DESC = (
+    "FC Mobile은 모바일 플랫폼에서 즐기는 축구 매니지먼트 & 액션 게임입니다."
+    "팀 구성, 전술 설정, 경기 중 실시간 조작(혹은 자동화)을 통해 승리를 노립니다."
+)
+
+KEY_FEATURES = [
+    ("팀 빌딩", "선수 스카우팅, 트레이닝, 포지션 배치"),
+    ("전술 커스터마이즈", "포메이션, 압박 레벨, 공격/수비 스타일 설정"),
+    ("라이브 경기", "간단한 터치로 슛/패스/드리블 조작 또는 자동 플레이"),
+    ("이벤트/리그", "친선전, 리그전, 토너먼트 이벤트 참여"),
+]
+
+CONTROLS = {
+    "터치/스와이프": "드리블, 슛 각도 조작",
+    "탭": "패스, 선수 선택",
+    "스페셜 버튼": "특수 기술(필살기) 사용",
+}
+
+TIPS = [
+    "초반에는 전체 스쿼드를 고르게 성장시키세요. 특정 포지션에만 치중하면 전술 운영이 어려워집니다.",
+    "상대 포메이션을 보고 전술을 유연하게 바꿔보세요. 측면이 약하면 측면 공격을 늘리세요.",
+    "이벤트는 보상을 주기 때문에 정기적으로 참여해 자원을 확보하세요.",
+]
+
+GLOSSARY = {
+    "포메이션": "팀의 포지션 배치 (예: 4-4-2, 4-3-3)",
+    "STAMINA(스태미너)": "경기 지속 능력. 선수를 교체해 관리하세요.",
+    "TAC(전술)": "팀 전체의 플레이 스타일을 조절합니다.",
+}
+
+EXAMPLE_PLAYERS = [
+    {"name": "김태호", "pos": "ST", "ovr": 78, "trait": "속력형"},
+    {"name": "이서윤", "pos": "CM", "ovr": 74, "trait": "패스마스터"},
+    {"name": "박준영", "pos": "CB", "ovr": 76, "trait": "수비형"},
+]
+
+# --- UI ---
+st.title(f"{GAME_TITLE} — 빠른 설명서 ⚽")
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    st.header("게임 한줄 요약")
+    st.write(GAME_DESC)
+
+    st.header("핵심 기능")
+    for name, desc in KEY_FEATURES:
+        st.markdown(f"**{name}** — {desc}")
+
+    st.header("초보자 팁")
+    for t in TIPS:
+        st.write("- " + t)
+
+    st.header("컨트롤 & 조작법")
+    for k, v in CONTROLS.items():
+        st.write(f"**{k}**: {v}")
+
+    st.header("예시 선수 스쿼드")
+    for p in EXAMPLE_PLAYERS:
+        st.write(f"{p['name']} — {p['pos']} • OVR {p['ovr']} • {p['trait']}")
+
+    with st.expander("전술 템플릿 예시 (클릭하여 보기)"):
+        st.subheader("안정형 4-2-3-1")
+        st.write("수비를 안정시키고 역습에 강한 설정. 수비형 미드필더 2명을 둡니다.")
+        st.subheader("공격형 4-3-3")
+        st.write("전방 압박과 측면 공격을 활용하는 공격적인 템플릿입니다.")
+
+    st.header("용어집")
+    for term, meaning in GLOSSARY.items():
+        st.write(f"**{term}** — {meaning}")
+
+with col2:
+    st.info("사이드바: 빠른 검색 & 설명 복사")
+
+    search_term = st.text_input("찾을 용어 검색", "포메이션")
+    if search_term:
+        results = []
+        # 간단한 검색: 키, 키워드 포함 여부
+        for d in [GAME_DESC] + [f"{name}: {desc}" for name, desc in KEY_FEATURES]:
+            if search_term.lower() in d.lower():
+                results.append(d)
+        for term, meaning in GLOSSARY.items():
+            if search_term.lower() in term.lower() or search_term.lower() in meaning.lower():
+                results.append(f"{term} — {meaning}")
+        if results:
+            st.write("검색 결과:")
+            for r in results:
+                st.write("- ", r)
+        else:
+            st.write("검색 결과가 없습니다. 다른 단어로 시도하세요.")
+
+    st.download_button(
+        label="설명서 텍스트로 다운로드",
+        data="\n".join([
+            GAME_TITLE,
+            "",
+            GAME_DESC,
+            "",
+            "핵심 기능:",
+        ] + [f"- {n}: {d}" for n, d in KEY_FEATURES] + ["", "팁:"] + [f"- {t}" for t in TIPS]),
+        file_name=f"{GAME_TITLE}_cheatsheet_{datetime.now().strftime('%Y%m%d')}.txt",
+        mime="text/plain",
+    )
+
+# Footer: 간단한 Q&A 자동 생성
+st.markdown("---")
+st.subheader("자주 묻는 질문(자동 생성)")
+faq_q = st.selectbox("질문 선택", [
+    "경기에서 빠르게 점수를 올리는 방법",
+    "선수 레벨업 효율적으로 하는 법",
+    "초보자가 주의할 점",
+])
+
+if faq_q == "경기에서 빠르게 점수를 올리는 방법":
+    st.write("측면 돌파 후 크로스, 세트피스 기회를 노려보세요. 직접 슛을 노릴 때는 슛 파워와 정확도를 함께 고려하세요.")
+elif faq_q == "선수 레벨업 효율적으로 하는 법":
+    st.write("주전 선수 위주로 훈련 횟수를 투자하고, 이벤트 보상으로 얻는 경험치 버프를 활용하세요.")
+else:
+    st.write("초반에는 무리한 과금이나 선수 편중을 피하고, 게임의 기본 조작과 전술 변화를 익히세요.")
+
+# Small utility: Export current page content as markdown
+if st.button("페이지 내용 복사(마크다운) → 클립보드"):
+    md = []
+    md.append(f"# {GAME_TITLE}\n")
+    md.append(GAME_DESC + "\n")
+    md.append("## 핵심 기능\n")
+    for n, d in KEY_FEATURES:
+        md.append(f"- **{n}**: {d}\n")
+    st.code("\n".join(md))
+    st.success("마크다운 형식이 아래 코드 블록에 생성되었습니다. Ctrl+C로 복사하세요.")
+
+# 마지막 안내
+st.caption("이 앱은 학습용 예시입니다. 실제 게임 정보는 게임 내 가이드나 공식 페이지를 참고하세요.")
