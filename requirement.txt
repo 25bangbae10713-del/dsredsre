@@ -1,182 +1,132 @@
 import streamlit as st
 from datetime import datetime
-import os
 
-# Try to import googletrans (community library) first. If not available, the app will
-# fall back to requiring a Google Cloud Translate API key (recommended for reliability).
-try:
-    from googletrans import Translator, LANGUAGES as GT_LANGS
-    HAS_GOOGLETRANS = True
-except Exception:
-    HAS_GOOGLETRANS = False
-    GT_LANGS = {}
+st.set_page_config(page_title="FC Mobile 스쿼드 & 공략 (수익화 버전)", page_icon="💰", layout="wide")
 
-# A small helper to normalize language dictionaries into the form {code: name}
-def get_language_map():
-    # Primary source: googletrans languages if available
-    lang_map = {}
-    if HAS_GOOGLETRANS:
-        # googletrans uses lowercase codes and English names
-        for code, name in GT_LANGS.items():
-            lang_map[code] = name.title()
-    # Add some common extra aliases (optional)
-    extras = {
-        "auto": "Auto Detect",
-    }
-    for k, v in extras.items():
-        if k not in lang_map:
-            lang_map[k] = v
-    # Make sure keys are sorted for display
-    return dict(sorted(lang_map.items(), key=lambda x: x[1]))
+# -----------------------
+# 1️⃣ 홈 & 소개
+# -----------------------
+st.title("⚽ FC Mobile 스쿼드 추천 & 공략 사이트 💰")
+st.markdown("""
+이 사이트는 **FC Mobile 스쿼드 추천 + 공략 정보**를 제공하며,  
+후원과 광고를 통해 개발자를 지원할 수 있습니다.
+- 스쿼드 추천 & 선수 검색  
+- 초보/중급자 공략 정보  
+- PDF 다운로드 기능(후원 시 가능)
+""")
 
-LANG_MAP = get_language_map()
+st.markdown("---")
 
-# Simple fuzzy search for language names or codes
-def search_languages(query):
-    q = query.strip().lower()
-    if not q:
-        return list(LANG_MAP.items())
-    results = []
-    for code, name in LANG_MAP.items():
-        if q in code.lower() or q in name.lower():
-            results.append((code, name))
-    # if no direct substring matches, do a loose startswith / contains on tokens
-    if not results:
-        for code, name in LANG_MAP.items():
-            tokens = name.lower().split()
-            if any(t.startswith(q) for t in tokens):
-                results.append((code, name))
-    return results
+# -----------------------
+# 2️⃣ 스쿼드 추천
+# -----------------------
+st.header("🏟️ 스쿼드 추천")
+players = [
+    {"name": "홍길동", "pos": "ST", "ovr": 78, "trait": "속력형"},
+    {"name": "이민호", "pos": "CM", "ovr": 74, "trait": "패스마스터"},
+    {"name": "김수아", "pos": "CB", "ovr": 76, "trait": "수비형"},
+    {"name": "박지훈", "pos": "LW", "ovr": 72, "trait": "드리블형"},
+    {"name": "최윤서", "pos": "RW", "ovr": 73, "trait": "스피드형"},
+    {"name": "강하늘", "pos": "GK", "ovr": 80, "trait": "골키퍼 전문가"},
+]
 
-# Translation function using googletrans if present
-def translate_with_googletrans(text, src, dest):
-    if not HAS_GOOGLETRANS:
-        raise RuntimeError("googletrans 패키지가 설치되어 있지 않습니다.")
-    translator = Translator()
-    res = translator.translate(text, src=src if src != "auto" else None, dest=dest)
-    return res.text, getattr(res, 'pronunciation', None)
+formation = st.selectbox("포메이션 선택", ["4-3-3", "4-2-3-1", "3-5-2"])
+st.subheader(f"{formation} 추천 스쿼드")
+st.table(players)
 
-# Placeholder for Google Cloud Translate fallback (requires API key)
-def translate_with_google_cloud(text, src, dest, api_key):
-    # We avoid depending on google-cloud-translate library here to keep the sample simple.
-    # If you want to use Google Cloud Translate, install `google-cloud-translate` and
-    # replace this function with an implementation that uses that client and the api_key.
-    raise NotImplementedError("Google Cloud Translate fallback not implemented in this sample.\n"
-                              "Install googletrans or implement the Cloud Translate client.")
+st.markdown("---")
 
-# Streamlit UI
-st.set_page_config(page_title="Universal Translator", page_icon="🌐", layout="wide")
-st.title("세상의 모든 언어 번역기 — 유니버설 트랜슬레이터 🌍")
-st.markdown(
-    """
-    이 앱은 `googletrans`(무료 커뮤니티 라이브러리)를 기본으로 사용합니다.
+# -----------------------
+# 3️⃣ 공략 정보
+# -----------------------
+st.header("📖 공략 정보")
+guides = [
+    "초반에는 전체 포지션 균형 있게 성장시키기",
+    "상대 팀 포메이션에 맞춘 공격 루트 조절",
+    "중반 이후 스페셜 스킬 활용 극대화",
+    "이벤트 참여로 보상 및 경험치 확보",
+    "골키퍼와 수비진은 체력 관리 필수"
+]
+for idx, tip in enumerate(guides, 1):
+    st.write(f"{idx}. {tip}")
 
-    **사용법**
-    1. 왼쪽에서 번역할 언어(검색 가능)를 고르고, 번역될 언어를 선택하세요.
-    2. 텍스트를 입력하고 `번역` 버튼을 누르세요.
+st.markdown("---")
 
-    **주의**: `googletrans`는 비공식 라이브러리라 때때로 제한될 수 있습니다. 안정적 사용을 위해
-    Google Cloud Translate API 키를 환경변수 `GOOGLE_API_KEY`로 설정하거나, 직접 Cloud Translate 클라이언트를
-    연결하세요. (고급 옵션은 하단을 참고)
-    """
-)
+# -----------------------
+# 4️⃣ 선수 검색 & 추천
+# -----------------------
+st.header("🔍 선수 검색 & 추천")
+search_name = st.text_input("선수 이름 검색", "")
+if search_name:
+    results = [p for p in players if search_name.lower() in p['name'].lower()]
+    if results:
+        st.write("검색 결과:")
+        st.table(results)
+    else:
+        st.write("검색 결과가 없습니다.")
 
-col1, col2 = st.columns([2, 1])
+pos_choice = st.selectbox("포지션별 추천 선수 보기", ["ST","CM","CB","LW","RW","GK"])
+recommended = [p for p in players if p['pos'] == pos_choice]
+st.subheader(f"{pos_choice} 포지션 추천 선수")
+st.table(recommended)
 
-with col1:
-    st.subheader("번역기")
-    input_text = st.text_area("번역할 텍스트를 입력하세요", height=200)
+st.markdown("---")
 
-    # Source language selector with search
-    st.markdown("**원문 언어 (검색 가능)**")
-    lang_search_src = st.text_input("원문 언어 검색", value="auto")
-    src_options = search_languages(lang_search_src)
-    # show as selectbox with "code — Name"
-    src_choice = st.selectbox(
-        "원문 언어 선택",
-        options=[f"{code} — {name}" for code, name in src_options],
-        index=0 if src_options else None,
-    )
-    src_code = src_choice.split(" — ")[0]
+# -----------------------
+# 5️⃣ PDF 다운로드 (후원 기반)
+# -----------------------
+st.header("💾 PDF 다운로드 (후원 필요)")
+st.write("후원 시 스쿼드 + 공략 PDF를 다운로드할 수 있습니다.")
 
-    # Target language selector with search
-    st.markdown("**번역 언어 (검색 가능)**")
-    lang_search_dst = st.text_input("번역 언어 검색", value="en", key="dst_search")
-    dst_options = search_languages(lang_search_dst)
-    dst_choice = st.selectbox(
-        "번역 언어 선택",
-        options=[f"{code} — {name}" for code, name in dst_options],
-        index=0 if dst_options else None,
-        key="dst_select",
-    )
-    dst_code = dst_choice.split(" — ")[0]
+# 후원 링크 예제 (토스, 페이팔 등)
+st.markdown("""
+[💰 후원하기 - 토스](https://toss.me/)  
+[💰 후원하기 - PayPal](https://www.paypal.com/donate)
+""")
 
-    col_btn1, col_btn2 = st.columns([1, 1])
-    with col_btn1:
-        translate_btn = st.button("번역")
-    with col_btn2:
-        swap_btn = st.button("언어 바꾸기 ↔")
+if st.button("PDF 다운로드 시뮬레이션"):
+    st.success("후원 후 PDF 다운로드가 가능합니다! (실제 결제 연동 필요)")
+    text_data = f"""
+FC Mobile 스쿼드 추천 & 공략
+작성일: {datetime.now().strftime('%Y-%m-%d')}
 
-    if swap_btn:
-        # Swap the search boxes by swapping their session state values
-        tmp = st.session_state.get("dst_search", "en")
-        st.session_state["dst_search"] = st.session_state.get("lang_search_src", "auto")
-        st.session_state["lang_search_src"] = tmp
-        st.experimental_rerun()
+포메이션: {formation}
 
-    translated_text = ""
-    pronunciation = None
-
-    if translate_btn:
-        if not input_text.strip():
-            st.warning("번역할 텍스트를 먼저 입력하세요.")
-        else:
-            try:
-                if HAS_GOOGLETRANS:
-                    translated_text, pronunciation = translate_with_googletrans(input_text, src_code, dst_code)
-                else:
-                    api_key = os.getenv("GOOGLE_API_KEY", None)
-                    if api_key:
-                        translated_text = translate_with_google_cloud(input_text, src_code, dst_code, api_key)
-                    else:
-                        st.error("서버에 `googletrans`가 설치되어 있지 않고, `GOOGLE_API_KEY`도 없습니다.\n"
-                                 "googletrans를 설치하거나 Google Cloud Translate API 키를 설정하세요.")
-            except Exception as e:
-                st.error(f"번역 중 오류가 발생했습니다: {e}")
-
-    if translated_text:
-        st.subheader("번역 결과")
-        st.write(translated_text)
-        if pronunciation:
-            st.caption(f"발음: {pronunciation}")
-        # Download button
-        st.download_button(
-            "번역 결과 다운로드",
-            translated_text,
-            file_name=f"translation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            mime="text/plain",
-        )
-
-with col2:
-    st.subheader("언어 찾아보기 & 설명")
-    q = st.text_input("언어 이름이나 코드를 입력해 찾아보세요 (예: korean, ko, spanish)")
-    if q:
-        matches = search_languages(q)
-        if matches:
-            for code, name in matches:
-                st.write(f"**{code}** — {name}")
-        else:
-            st.write("일치하는 언어를 찾을 수 없습니다.")
-
-    st.markdown("---")
-    st.subheader("환경 설정 (옵션)")
-    st.write("- 안정적이고 많은 언어 지원을 원하면 Google Cloud Translate API 키를 설정하세요.")
-    st.write("- 기본 무료 옵션은 `googletrans` 라이브러리에 의존합니다 (비공식).\n  이를 사용하려면 레포에 requirements.txt에 `googletrans==4.0.0-rc1`를 추가하세요.")
-
-    st.markdown("---")
-    st.subheader("개발자용 메모")
-    st.write(
-        "이 샘플은 학습용입니다. '세상의 모든 언어'를 완벽히 지원하려면 상용 API(예: Google Cloud, Azure Translator, DeepL 엔터프라이즈 등)를 연결하는 것이 좋습니다."
+추천 스쿼드:
+"""
+    for p in players:
+        text_data += f"- {p['name']} | {p['pos']} | OVR {p['ovr']} | {p['trait']}\n"
+    text_data += "\n공략 정보:\n"
+    for tip in guides:
+        text_data += f"- {tip}\n"
+    st.download_button(
+        "다운로드 PDF(텍스트)", text_data,
+        file_name=f"fc_mobile_guide_{datetime.now().strftime('%Y%m%d')}.txt",
+        mime="text/plain"
     )
 
-st.caption("이 앱은 예시용입니다. 실제 번역 품질은 사용된 엔진에 따라 달라집니다.")
+st.markdown("---")
+
+# -----------------------
+# 6️⃣ 광고 배너 예제
+# -----------------------
+st.header("📢 광고 배너")
+st.info("여기에 실제 Google AdSense 광고 코드 삽입 가능")
+st.markdown("""
+[광고 영역 예시]  
+- 게임 용품, 스마트폰, 구글 플레이 게임 추천 등
+""")
+
+st.markdown("---")
+
+# -----------------------
+# 7️⃣ 사용자 통계 기록 (간단)
+# -----------------------
+st.header("📊 간단 통계 (클릭/다운로드)")
+if 'downloads' not in st.session_state:
+    st.session_state.downloads = 0
+if st.button("다운로드 기록 추가"):
+    st.session_state.downloads += 1
+st.write(f"총 PDF 다운로드 시뮬레이션 횟수: {st.session_state.downloads}")
+
+st.caption("⚠️ 실제 수익화 시에는 결제 API 연동, 광고 스크립트 삽입 필요")
